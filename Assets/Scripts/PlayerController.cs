@@ -14,10 +14,13 @@ public class PlayerController : MonoBehaviour
 
     private int count;
 
+    private int totalPickupCount;
+
     void Start()
     {
         rb = GetComponent<Rigidbody>();
         count = 0;
+        totalPickupCount = GameObject.FindGameObjectsWithTag("PickUp").Length;
         
         SetCountText();
     }
@@ -48,9 +51,23 @@ public class PlayerController : MonoBehaviour
     void SetCountText()
     {
         countText.text = "Count: " + count.ToString();
-        if (count >= 5)
+        if (count >= totalPickupCount)
         {
             winTextObject.SetActive(true);
+            // winTextObject.GetComponent<TextMeshProUGUI>().text = "You Win!";
+            Destroy(GameObject.FindGameObjectWithTag("Enemy"));
+        }
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (collision.gameObject.CompareTag("Enemy"))
+        {
+            // Destroy the current object
+            Destroy(gameObject); 
+            // Update the winText to display "You Lose!"
+            winTextObject.gameObject.SetActive(true);
+            winTextObject.GetComponent<TextMeshProUGUI>().text = "You Lose!";
         }
     }
 }
