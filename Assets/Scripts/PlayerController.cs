@@ -20,6 +20,7 @@ public class PlayerController : MonoBehaviour
     private int totalPickupCount;
 
     public float attachmentOffset = 0.5f;
+    public float attachmentOffsetFraction = 0.5f;
     public float colliderCooldown = 0.2f;
     public float countSpeedBoost = 0.1f;
 
@@ -78,6 +79,7 @@ public class PlayerController : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
+        
         if (collision.gameObject.CompareTag("Enemy"))
         {
             // Destroy the current object
@@ -86,37 +88,46 @@ public class PlayerController : MonoBehaviour
             winTextObject.gameObject.SetActive(true);
             winTextObject.GetComponent<TextMeshProUGUI>().text = "You Lose!";
         }
+    }
 
-        var isSticky = collision.gameObject.GetComponent<StickyObject>();
-        if (isSticky && isSticky.weight < count)
+    private void OnCollisionStay(Collision collision)
+    {
+        var stickyThing = collision.gameObject.GetComponent<StickyObject>();
+        if (stickyThing && stickyThing.weight <= count)
         {
-            // stick object center to surface
-            StartCoroutine(SleepCollider(collision.collider));
-            Attach(collision.transform);
+            Destroy(stickyThing);
+            Attach(collision);
+            
+            // Briefly disallow object to "touch" other things,
+            // avoids instantly picking up big patches of objects
+            collision.collider.enabled = false;
+            StartCoroutine(ActivateColliderLater(collision.collider));
         }
     }
 
-    private void Attach(Transform t)
+    private void Attach(Collision c)
     {
+        var col = c.collider;
+        var t = c.transform;
         // Debug.Log("Sticky! " +  t.name);
         t.SetParent(transform);
 
         var collisionPos = rb.ClosestPointOnBounds(t.position);
         var towardsCollision = (collisionPos - transform.position).normalized;
-        t.position = collisionPos + towardsCollision * attachmentOffset;
+        var colliderThickness = col.bounds.extents.magnitude;
+        // t.position = collisionPos; // stick object center to collision point (surface?)
+        t.position += towardsCollision * attachmentOffset;
+        t.position += towardsCollision * attachmentOffsetFraction * colliderThickness;
 
         var tRb = t.GetComponent<Rigidbody>();
         if (tRb) Destroy(tRb);
 
         var tObstacleComp = t.GetComponent<NavMeshObstacle>();
         if (tObstacleComp) tObstacleComp.enabled = false;
-
-        // other.position =  transform.position + direction * 0.5f;
     }
 
-    private IEnumerator SleepCollider(Collider c)
+    private IEnumerator ActivateColliderLater(Collider c)
     {
-        c.enabled = false;
         yield return new WaitForSeconds(colliderCooldown);
         c.enabled = true;
     }
