@@ -1,9 +1,12 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
+using Unity.Mathematics;
 using UnityEngine.InputSystem;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.SceneManagement;
 
 public class PlayerController : MonoBehaviour
 {
@@ -23,6 +26,8 @@ public class PlayerController : MonoBehaviour
     public float attachmentOffsetFraction = 0.5f;
     public float colliderCooldown = 0.2f;
     public float countSpeedBoost = 0.1f;
+    
+    private HashSet<GameObject> _stickyObjects = new();
 
     void Start()
     {
@@ -40,11 +45,30 @@ public class PlayerController : MonoBehaviour
         movementY = movementVector.y;
     }
 
+    void OnCancel(InputValue value)
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
     void FixedUpdate()
     {
         Vector3 movement = new Vector3(movementX, 0.0f, movementY);
         var speedMult = speed * Math.Pow(1.0f + countSpeedBoost, count);
         rb.AddForce(movement * (float)speedMult);
+        
+        var isOnFloor = rb.linearVelocity.y < 0.1;
+        
+        if (!isOnFloor) return;
+        var rollingSpeed = Math.Min(rb.angularVelocity.sqrMagnitude, 10) * 0.01f;
+        foreach (var stickyObject in _stickyObjects)
+        {
+            var dPos = transform.position - stickyObject.transform.position;
+            if (dPos.y < 0) continue; // Only compress objects below player
+            
+            var sqdY = dPos.y * Math.Abs(dPos.y);
+            var distanceBonus = math.remap(0, 6, 0, 3, sqdY);
+            stickyObject.transform.position = Vector3.Lerp(stickyObject.transform.position, transform.position, distanceBonus * rollingSpeed * Time.fixedDeltaTime);    
+        }
     }
 
     void OnTriggerEnter(Collider other)
@@ -97,6 +121,7 @@ public class PlayerController : MonoBehaviour
         {
             Destroy(stickyThing);
             Attach(collision);
+            _stickyObjects.Add(collision.gameObject);
             
             // Briefly disallow object to "touch" other things,
             // avoids instantly picking up big patches of objects
